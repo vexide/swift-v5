@@ -1,0 +1,44 @@
+[package]
+name = "swift-v5"
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/vexide/swift-v5"
+authors = [
+    "Lewis McClelland <lewis@lewismcclelland.me>"
+]
+description = "Create VEX V5 programs in Swift"
+
+[dependencies]
+camino = "1.1.10"
+clap = { version = "4.5.40", features = ["derive"] }
+directories = "6.0.0"
+fs-err = { version = "3.1.1", features = ["tokio"] }
+futures = { version = "0.3.31", default-features = false }
+hex = "0.4.3"
+human-panic = "2.0.2"
+indicatif = "0.17.11"
+inquire = "0.7.5"
+liblzma = "0.4.2"
+miette = { version = "7.6.0", features = ["fancy"] }
+octocrab = "0.44.1"
+owo-colors = "4.2.1"
+rayon = "1.10.0"
+reqwest = { version = "0.12.20", features = ["stream"] }
+scopeguard = "1.2.0"
+serde = { version = "1.0.219", features = ["derive"] }
+sha2 = "0.10.9"
+strum = { version = "0.27.1", features = ["derive"] }
+tar = "0.4.44"
+tempfile = "3.20.0"
+thiserror = "2.0.12"
+tokio = { version = "1.45.1", features = ["macros", "rt", "rt-multi-thread", "signal"] }
+tokio-util = { version = "0.7.15", features = ["rt"] }
+toml = "0.8.23"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+trash = "5.2.2"
+walkdir = "2.5.0"
+zip = { version = "4.1.0" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+dmg = "0.1.2"
