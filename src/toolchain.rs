@@ -436,7 +436,7 @@ impl ToolchainClient {
             .with_message("Extracting toolchain... (this may take a few minutes)")
             .with_style(PROGRESS_STYLE_SPINNER.clone());
 
-        progress_bar.enable_steady_tick(Duration::from_millis(100));
+        progress_bar.enable_steady_tick(Duration::from_millis(300));
 
         if extract_location.exists() {
             debug!("Destination folder already exists, removing it");
