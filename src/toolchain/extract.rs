@@ -25,11 +25,15 @@ pub mod macos;
 
 #[cfg(not(target_os = "macos"))]
 pub mod macos {
+    use indicatif::ProgressBar;
+    use tokio_util::sync::CancellationToken;
+
     use super::*;
 
     pub async fn extract_dmg(
         _dmg_path: PathBuf,
         _destination_folder: &Path,
+        _progress_bar: &ProgressBar,
         _cancel_token: CancellationToken,
     ) -> Result<(), ToolchainError> {
         Err(ExtractError::DmgNotSupported.into())
@@ -79,6 +83,18 @@ pub async fn extract_zip(
     Ok(file.into())
 }
 
+async fn mv(src: &Path, dst: &Path) -> io::Result<()> {
+    match fs::rename(src, dst).await {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
+            fs::copy(src, dst).await?;
+            fs::remove_file(src).await?;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub async fn extract_tar_xz(
     tar_xz_file: fs::File,
     destination: PathBuf,
@@ -109,7 +125,7 @@ pub async fn extract_tar_xz(
 
     // Find the root directory in the extracted contents and move it to the destination
     let root_dir = find_dir_contained_by(temp_destination.path()).await?;
-    fs::rename(&root_dir, &destination).await?;
+    mv(&root_dir, &destination).await?;
 
     Ok(file.into())
 }
