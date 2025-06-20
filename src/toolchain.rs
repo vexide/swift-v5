@@ -455,7 +455,7 @@ impl ToolchainClient {
         } else if file_name.ends_with(".zip") {
             extract::extract_zip(downloaded_file, extract_location.clone()).await?;
         } else if file_name.ends_with(".tar.xz") {
-            extract::extract_tar_xz(downloaded_file, extract_location.clone()).await?;
+            extract::extract_tar_xz(downloaded_file, extract_location.clone(), cancel_token).await?;
         } else {
             unreachable!("Unsupported file format");
         }

@@ -13,12 +13,15 @@ use tempfile::tempdir;
 use thiserror::Error;
 use tokio::{
     io::{self},
-    task::spawn_blocking,
+    runtime::Handle,
+    task::{JoinSet, spawn_blocking},
 };
-use tracing::debug;
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, instrument, trace};
+use walkdir::WalkDir;
 use zip::{read::root_dir_common_filter, result::ZipError};
 
-use crate::{fs, toolchain::ToolchainError};
+use crate::{CheckCancellation, fs, toolchain::ToolchainError};
 
 #[cfg(target_os = "macos")]
 pub mod macos;
@@ -83,21 +86,10 @@ pub async fn extract_zip(
     Ok(file.into())
 }
 
-async fn mv(src: &Path, dst: &Path) -> io::Result<()> {
-    match fs::rename(src, dst).await {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
-            fs::copy(src, dst).await?;
-            fs::remove_file(src).await?;
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
-
 pub async fn extract_tar_xz(
     tar_xz_file: fs::File,
     destination: PathBuf,
+    cancel_token: CancellationToken,
 ) -> Result<fs::File, ToolchainError> {
     let mut reader = BufReader::new(tar_xz_file.into_std().await);
 
@@ -116,7 +108,7 @@ pub async fn extract_tar_xz(
             let mut archive = tar::Archive::new(&mut decompressor);
 
             archive.unpack(temp_destination.path())?;
-
+            debug!("Done unpacking");
             Ok::<_, io::Error>(reader.into_inner())
         }
     })
@@ -125,7 +117,8 @@ pub async fn extract_tar_xz(
 
     // Find the root directory in the extracted contents and move it to the destination
     let root_dir = find_dir_contained_by(temp_destination.path()).await?;
-    mv(&root_dir, &destination).await?;
+    debug!("mv");
+    mv(&root_dir, &destination, cancel_token).await?;
 
     Ok(file.into())
 }
@@ -144,4 +137,88 @@ async fn find_dir_contained_by(parent_dir: &Path) -> Result<PathBuf, ToolchainEr
     }
 
     Ok(contents_path.ok_or(ExtractError::ContentsNotFound)?)
+}
+
+pub async fn mv(src: &Path, dst: &Path, cancel_token: CancellationToken) -> Result<(), ToolchainError> {
+    match fs::rename(src, dst).await {
+        Ok(()) => Ok(()),
+        // Moving from /tmp/ to /anywhere-else/ isn't possible with a simple fs::rename because
+        // we're moving across devices, so we'll fallback to the more complicated recursive
+        // copy-and-delete method if that fails.
+        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
+            copy_folder(src, dst.to_path_buf(), cancel_token.clone()).await?;
+            Ok(())
+        }
+        Err(e) => Err(ToolchainError::Io(e)),
+    }
+}
+
+#[instrument(skip(cancel_token))]
+async fn copy_folder(
+    source: &Path,
+    destination: PathBuf,
+    cancel_token: CancellationToken,
+) -> Result<(), ToolchainError> {
+    debug!("Copying folder");
+
+    let source = Arc::new(fs::canonicalize(source).await?);
+    let destination = Arc::new(destination);
+
+    let mut tasks = spawn_blocking({
+        move || {
+            let mut tasks = JoinSet::new();
+
+            for entry in WalkDir::new(&*source) {
+                let entry = entry.map_err(ExtractError::WalkDir)?;
+
+                if cancel_token.is_cancelled() {
+                    Handle::current().block_on(tasks.join_all());
+                    return Err(ToolchainError::Cancelled);
+                }
+
+                let source = source.clone();
+                let destination = destination.clone();
+                let cancel_token = cancel_token.clone();
+
+                tasks.spawn(async move {
+                    if entry.file_type().is_dir() {
+                        return Ok(());
+                    }
+
+                    let relative_path = entry.path().strip_prefix(&*source).unwrap();
+                    let destination_path = destination.join(relative_path);
+
+                    let destination_parent = destination_path.parent().unwrap();
+
+                    cancel_token.check_cancellation(ToolchainError::Cancelled)?;
+                    fs::create_dir_all(destination_parent).await?;
+
+                    if entry.path_is_symlink() {
+                        let target = fs::read_link(entry.path()).await?;
+                        trace!(?target, ?destination_path, "Creating symlink");
+
+                        cancel_token.check_cancellation(ToolchainError::Cancelled)?;
+
+                        // NOTE: unix-only, but this is a macOS-specific module
+                        fs::symlink(target, &destination_path).await?;
+                    }
+
+                    cancel_token.check_cancellation(ToolchainError::Cancelled)?;
+                    fs::copy(entry.path(), &destination_path).await?;
+
+                    Ok::<_, ToolchainError>(())
+                });
+            }
+
+            Ok::<_, ToolchainError>(tasks)
+        }
+    })
+    .await
+    .unwrap()?;
+
+    while let Some(result) = tasks.join_next().await {
+        result.unwrap()?;
+    }
+
+    Ok(())
 }

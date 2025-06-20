@@ -18,7 +18,7 @@ use crate::{
     CheckCancellation, fs,
     toolchain::{
         ToolchainError,
-        extract::{ExtractError, find_dir_contained_by},
+        extract::{ExtractError, find_dir_contained_by, copy_folder},
     },
 };
 
@@ -72,76 +72,6 @@ pub async fn extract_dmg(
                 sleep(Duration::from_millis(500)).await;
             }
         }
-    }
-
-    Ok(())
-}
-
-#[instrument(skip(cancel_token))]
-async fn copy_folder(
-    source: &Path,
-    destination: PathBuf,
-    cancel_token: CancellationToken,
-) -> Result<(), ToolchainError> {
-    debug!("Copying folder");
-
-    let source = Arc::new(fs::canonicalize(source).await?);
-    let destination = Arc::new(destination);
-
-    let mut tasks = spawn_blocking({
-        move || {
-            let mut tasks = JoinSet::new();
-
-            for entry in WalkDir::new(&*source) {
-                let entry = entry.map_err(ExtractError::WalkDir)?;
-
-                if cancel_token.is_cancelled() {
-                    Handle::current().block_on(tasks.join_all());
-                    return Err(ToolchainError::Cancelled);
-                }
-
-                let source = source.clone();
-                let destination = destination.clone();
-                let cancel_token = cancel_token.clone();
-
-                tasks.spawn(async move {
-                    if entry.file_type().is_dir() {
-                        return Ok(());
-                    }
-
-                    let relative_path = entry.path().strip_prefix(&*source).unwrap();
-                    let destination_path = destination.join(relative_path);
-
-                    let destination_parent = destination_path.parent().unwrap();
-
-                    cancel_token.check_cancellation(ToolchainError::Cancelled)?;
-                    fs::create_dir_all(destination_parent).await?;
-
-                    if entry.path_is_symlink() {
-                        let target = fs::read_link(entry.path()).await?;
-                        trace!(?target, ?destination_path, "Creating symlink");
-
-                        cancel_token.check_cancellation(ToolchainError::Cancelled)?;
-
-                        // NOTE: unix-only, but this is a macOS-specific module
-                        fs::symlink(target, &destination_path).await?;
-                    }
-
-                    cancel_token.check_cancellation(ToolchainError::Cancelled)?;
-                    fs::copy(entry.path(), &destination_path).await?;
-
-                    Ok::<_, ToolchainError>(())
-                });
-            }
-
-            Ok::<_, ToolchainError>(tasks)
-        }
-    })
-    .await
-    .unwrap()?;
-
-    while let Some(result) = tasks.join_next().await {
-        result.unwrap()?;
     }
 
     Ok(())
