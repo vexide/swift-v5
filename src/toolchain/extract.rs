@@ -203,8 +203,14 @@ async fn copy_folder(
 
                         cancel_token.check_cancellation(ToolchainError::Cancelled)?;
 
-                        // NOTE: unix-only, but this is a macOS-specific module
+                        #[cfg(unix)]
                         fs::symlink(target, &destination_path).await?;
+                        #[cfg(windows)]
+                        {
+                            // On Windows, we create a hard link instead of a symlink
+                            // because symlinks require elevated permissions.
+                            fs::hard_link(target, &destination_path).await?;
+                        }
                     }
 
                     cancel_token.check_cancellation(ToolchainError::Cancelled)?;
