@@ -139,7 +139,11 @@ async fn find_dir_contained_by(parent_dir: &Path) -> Result<PathBuf, ToolchainEr
     Ok(contents_path.ok_or(ExtractError::ContentsNotFound)?)
 }
 
-pub async fn mv(src: &Path, dst: &Path, cancel_token: CancellationToken) -> Result<(), ToolchainError> {
+pub async fn mv(
+    src: &Path,
+    dst: &Path,
+    cancel_token: CancellationToken,
+) -> Result<(), ToolchainError> {
     match fs::rename(src, dst).await {
         Ok(()) => Ok(()),
         // Moving from /tmp/ to /anywhere-else/ isn't possible with a simple fs::rename because

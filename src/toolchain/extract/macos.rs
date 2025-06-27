@@ -1,24 +1,22 @@
 //! Logic for extracting macOS DMG files.
 
 use std::{
-    mem, path::{Path, PathBuf}, sync::Arc, time::Duration
+    mem,
+    path::{Path, PathBuf},
+    time::Duration,
 };
 
 use dmg::detach;
 use indicatif::ProgressBar;
-use tokio::{
-    runtime::Handle,
-    task::{spawn_blocking, JoinSet}, time::sleep,
-};
+use tokio::{task::spawn_blocking, time::sleep};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument, trace};
-use walkdir::WalkDir;
+use tracing::debug;
 
 use crate::{
-    CheckCancellation, fs,
+    CheckCancellation,
     toolchain::{
         ToolchainError,
-        extract::{ExtractError, find_dir_contained_by, copy_folder},
+        extract::{ExtractError, copy_folder, find_dir_contained_by},
     },
 };
 
@@ -48,7 +46,12 @@ pub async fn extract_dmg(
     let contents_path = find_dir_contained_by(&dmg.mount_point).await?;
 
     cancel_token.check_cancellation(ToolchainError::Cancelled)?;
-    copy_folder(&contents_path, destination_folder.to_owned(), cancel_token.clone()).await?;
+    copy_folder(
+        &contents_path,
+        destination_folder.to_owned(),
+        cancel_token.clone(),
+    )
+    .await?;
 
     debug!(?dmg.mount_point, "Unmounting DMG");
     progress_bar.set_message("Cleaning up...");

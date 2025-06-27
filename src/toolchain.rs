@@ -5,7 +5,12 @@
 //! directory. It also handles checksum verification and extraction of the downloaded archive.
 
 use std::{
-    cell::OnceCell, fmt::{self, Debug, Display}, io::SeekFrom, path::{Path, PathBuf}, sync::Arc, time::Duration
+    cell::OnceCell,
+    fmt::{self, Debug, Display},
+    io::SeekFrom,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
 };
 
 use camino::Utf8Path;
@@ -25,7 +30,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, instrument, trace, warn};
 
 use crate::{
-    fs, CheckCancellation, Result, DIRS, PROGRESS_STYLE, PROGRESS_STYLE_MSG, PROGRESS_STYLE_SPINNER, TRASH
+    CheckCancellation, DIRS, PROGRESS_STYLE, PROGRESS_STYLE_MSG, PROGRESS_STYLE_SPINNER, Result,
+    TRASH, fs,
 };
 
 mod extract;
@@ -296,7 +302,11 @@ impl ToolchainClient {
     ) -> Result<Self> {
         let toolchains_path = toolchains_path.into();
         let cache_path = cache_path.into();
-        trace!(?toolchains_path, ?cache_path, "Initializing toolchain downloader");
+        trace!(
+            ?toolchains_path,
+            ?cache_path,
+            "Initializing toolchain downloader"
+        );
 
         tokio::try_join!(
             fs::create_dir_all(&toolchains_path),
@@ -455,7 +465,8 @@ impl ToolchainClient {
         } else if file_name.ends_with(".zip") {
             extract::extract_zip(downloaded_file, extract_location.clone()).await?;
         } else if file_name.ends_with(".tar.xz") {
-            extract::extract_tar_xz(downloaded_file, extract_location.clone(), cancel_token).await?;
+            extract::extract_tar_xz(downloaded_file, extract_location.clone(), cancel_token)
+                .await?;
         } else {
             unreachable!("Unsupported file format");
         }

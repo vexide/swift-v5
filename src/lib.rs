@@ -39,7 +39,8 @@ pub static DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
 });
 
 pub static TRASH: LazyLock<TrashContext> = LazyLock::new(|| {
-    let ctx = TrashContext::new();
+    #[allow(unused_mut)]
+    let mut ctx = TrashContext::new();
 
     // Opt in to faster deletion method
     #[cfg(target_os = "macos")]
