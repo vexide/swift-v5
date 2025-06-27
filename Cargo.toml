@@ -25,6 +25,7 @@ inquire = "0.7.5"
 liblzma = "0.4.2"
 miette = { version = "7.6.0", features = ["fancy"] }
 octocrab = "0.44.1"
+openssl = { version = "0.10.73", features = ["vendored"] }
 owo-colors = "4.2.1"
 rayon = "1.10.0"
 reqwest = { version = "0.12.20", features = ["stream"] }
