@@ -19,7 +19,8 @@ install-updater = false
 tap = "vexide/homebrew-vexide"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
-publish-preleases = true
+# Whether to publish prereleases to package managers
+publish-prereleases = true
 
 [dist.github-custom-runners]
 global = "ubuntu-24.04"
