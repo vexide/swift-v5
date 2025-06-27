@@ -62,8 +62,14 @@ llvm-version = "20.1.0"
 
 ## Uninstall
 
-If you installed swift-v5 using the shell or powershell scripts above, you can remove it by running this command in your Unix shell or in PowerShell:
+If you installed swift-v5 using the shell or powershell scripts above, you can remove it by running this command in your Unix shell:
 
 ```sh
 rm ~/.local/bin/swift-v5 ~/.config/swift-v5/swift-v5-receipt.json
+```
+
+Or by running this in PowerShell:
+
+```powershell
+rm ~\.local\bin\swift-v5 "$env:LOCALAPPDATA\swift-v5\swift-v5-receipt.json"
 ```
