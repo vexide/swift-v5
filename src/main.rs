@@ -1,5 +1,6 @@
-use std::process::exit;
+use std::{process::exit, sync::LazyLock};
 
+use axoupdater::AxoUpdater;
 use clap::{Parser, Subcommand};
 use human_panic::Metadata;
 use inquire::Confirm;
@@ -9,6 +10,7 @@ use swift_v5::{
     project::Project,
     toolchain::{HostArch, HostOS, ToolchainClient, ToolchainVersion},
 };
+use tokio::{sync::Mutex, task::block_in_place};
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{EnvFilter, util::SubscriberInitExt};
 
@@ -27,6 +29,9 @@ struct Args {
 enum Commands {
     /// Install the toolchain for this project
     Install {},
+    /// Update swift-v5 to the latest version
+    #[clap(hide = !can_update())]
+    Update {},
 }
 
 #[tokio::main]
@@ -50,6 +55,9 @@ async fn main() -> miette::Result<()> {
     match args.command {
         Commands::Install {} => {
             install().await?;
+        }
+        Commands::Update {} => {
+            update().await?;
         }
     }
 
@@ -126,5 +134,36 @@ async fn install() -> swift_v5::Result<()> {
         .await?;
     msg!("Downloaded", "to {}", destination.display());
 
+    Ok(())
+}
+
+static UPDATER: LazyLock<Mutex<AxoUpdater>> =
+    LazyLock::new(|| Mutex::new(AxoUpdater::new_for("swift-v5")));
+
+fn can_update() -> bool {
+    block_in_place(|| UPDATER.blocking_lock().load_receipt().is_ok())
+}
+
+async fn update() -> swift_v5::Result<()> {
+    let mut updater = UPDATER.lock().await;
+
+    updater
+        .load_receipt()
+        .map_err(|_| swift_v5::Error::SelfUpdateUnavailable)?;
+
+    eprintln!("Running self-update...");
+    if let Some(update) = updater.run().await? {
+        msg!(
+            "Updated",
+            "swift-v5 v{} -> v{}",
+            update
+                .old_version
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "[unknown]".to_string()),
+            update.new_version
+        );
+    } else {
+        eprintln!("No updates available.");
+    }
     Ok(())
 }

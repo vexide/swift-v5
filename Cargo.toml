@@ -3,12 +3,16 @@ name = "swift-v5"
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/vexide/swift-v5"
+homepage = "https://github.com/vexide/swift-v5"
 authors = [
-    "Lewis McClelland <lewis@lewismcclelland.me>"
+    "vexide",
+    "Lewis McClelland <lewis@lewismcclelland.me>",
+    "Tropical"
 ]
 description = "Create VEX V5 programs in Swift"
 
 [dependencies]
+axoupdater = { version = "0.9.0", default-features = false, features = ["github_releases"] }
 camino = "1.1.10"
 clap = { version = "4.5.40", features = ["derive"] }
 directories = "6.0.0"
@@ -42,3 +46,8 @@ zip = { version = "4.1.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 dmg = "0.1.2"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

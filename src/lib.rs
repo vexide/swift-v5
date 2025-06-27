@@ -1,5 +1,6 @@
 use std::{io, sync::LazyLock};
 
+use axoupdater::AxoupdateError;
 use directories::ProjectDirs;
 use indicatif::ProgressStyle;
 use miette::Diagnostic;
@@ -55,7 +56,7 @@ pub static TRASH: LazyLock<TrashContext> = LazyLock::new(|| {
 #[macro_export]
 macro_rules! msg {
     ($label:expr, $($rest:tt)+) => {
-        println!("{:>12} {}", $label.green().bold(), format_args!($($rest)+))
+        eprintln!("{:>12} {}", $label.green().bold(), format_args!($($rest)+))
     };
 }
 
@@ -72,15 +73,24 @@ pub enum Error {
         #[from]
         source: toml::de::Error,
     },
+    #[error("swift-v5's updates are externally managed")]
+    #[diagnostic(code(swift_v5::self_update::unavailable))]
+    #[diagnostic(help("update swift-v5 with your package manager or redownload the executable"))]
+    SelfUpdateUnavailable,
+
     #[error(transparent)]
     #[diagnostic(transparent)]
     Toolchain(#[from] toolchain::ToolchainError),
+
     #[error(transparent)]
     #[diagnostic(code(swift_v5::interactive_prompt_failed))]
     Inquire(#[from] inquire::InquireError),
     #[error(transparent)]
     #[diagnostic(code(swift_v5::io_error))]
     Io(#[from] io::Error),
+    #[error("Self-update failed")]
+    #[diagnostic(code(swift_v5::self_update::failed))]
+    AxoUpdate(#[from] AxoupdateError),
 }
 
 trait CheckCancellation {
