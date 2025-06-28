@@ -17,7 +17,7 @@ use tokio::{
     task::{JoinSet, spawn_blocking},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument, trace};
+use tracing::{debug, instrument, trace, warn};
 use walkdir::WalkDir;
 use zip::{read::root_dir_common_filter, result::ZipError};
 
@@ -204,17 +204,23 @@ async fn copy_folder(
                         cancel_token.check_cancellation(ToolchainError::Cancelled)?;
 
                         #[cfg(unix)]
-                        fs::symlink(target, &destination_path).await?;
+                        fs::symlink(&target, &destination_path).await?;
+                        // On Windows, we create a hard link instead of a symlink
+                        // because symlinks require elevated permissions.
                         #[cfg(windows)]
-                        {
-                            // On Windows, we create a hard link instead of a symlink
-                            // because symlinks require elevated permissions.
-                            fs::hard_link(target, &destination_path).await?;
-                        }
+                        fs::hard_link(&target, &destination_path).await?;
+                    } else {
+                        cancel_token.check_cancellation(ToolchainError::Cancelled)?;
+                        fs::copy(entry.path(), &destination_path).await?;
                     }
 
                     cancel_token.check_cancellation(ToolchainError::Cancelled)?;
-                    fs::copy(entry.path(), &destination_path).await?;
+
+                    let metadata = spawn_blocking(move || entry.metadata())
+                        .await
+                        .unwrap()
+                        .map_err(ExtractError::from)?;
+                    fs::set_permissions(&destination_path, metadata.permissions()).await?;
 
                     Ok::<_, ToolchainError>(())
                 });
