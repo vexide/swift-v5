@@ -28,7 +28,13 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Install the toolchain for this project
-    Install {},
+    Install {
+        #[clap(
+            long,
+            help = "Force re-installation of the toolchain, even if it is already installed"
+        )]
+        force: bool,
+    },
     /// Update swift-v5 to the latest version
     #[clap(hide = !can_update())]
     Update {},
@@ -53,8 +59,8 @@ async fn main() -> miette::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Commands::Install {} => {
-            install().await?;
+        Commands::Install { force } => {
+            install(force).await?;
         }
         Commands::Update {} => {
             update().await?;
@@ -64,7 +70,7 @@ async fn main() -> miette::Result<()> {
     Ok(())
 }
 
-async fn install() -> swift_v5::Result<()> {
+async fn install(force: bool) -> swift_v5::Result<()> {
     let project = Project::find().await?;
     let toolchain = ToolchainClient::using_data_dir().await?;
 
@@ -82,14 +88,16 @@ async fn install() -> swift_v5::Result<()> {
         installing_specific_version = false;
     }
 
-    let already_installed = toolchain.install_path_for(&toolchain_version);
-    if already_installed.exists() {
-        println!(
-            "Toolchain up-to-date: {} at {}",
-            toolchain_version.to_string().bold(),
-            already_installed.display().green()
-        );
-        return Ok(());
+    if !force {
+        let already_installed = toolchain.install_path_for(&toolchain_version);
+        if already_installed.exists() {
+            println!(
+                "Toolchain up-to-date: {} at {}",
+                toolchain_version.to_string().bold(),
+                already_installed.display().green()
+            );
+            return Ok(());
+        }
     }
 
     let confirm_message = if installing_specific_version {

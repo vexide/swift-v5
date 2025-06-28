@@ -7,6 +7,7 @@ use std::{
     sync::Arc,
 };
 
+use backon::{ConstantBuilder, Retryable};
 use liblzma::read::XzDecoder;
 use miette::Diagnostic;
 use tempfile::tempdir;
@@ -220,7 +221,10 @@ async fn copy_folder(
                         .await
                         .unwrap()
                         .map_err(ExtractError::from)?;
-                    fs::set_permissions(&destination_path, metadata.permissions()).await?;
+
+                    (async || fs::set_permissions(&destination_path, metadata.permissions()).await)
+                        .retry(ConstantBuilder::default())
+                        .await?;
 
                     Ok::<_, ToolchainError>(())
                 });
