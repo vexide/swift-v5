@@ -78,8 +78,8 @@ async fn install(force: bool) -> swift_v5::Result<()> {
     let confirm_message;
     let toolchain_version;
     if let Some(config) = project.config().await? {
-        toolchain_release = toolchain.get_release(&config.llvm_version).await?;
-        toolchain_version = toolchain_release.version().to_owned();
+        toolchain_version = ToolchainVersion::named(&config.llvm_version);
+        toolchain_release = toolchain.get_release(&toolchain_version).await?;
         confirm_message = format!("Download & install LLVM toolchain {toolchain_version}?");
     } else {
         toolchain_release = toolchain.latest_release().await?;
