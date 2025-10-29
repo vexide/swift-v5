@@ -173,7 +173,9 @@ async fn symlink() -> swift_v5::Result<()> {
     };
     let already_installed = toolchain.install_path_for(&version);
     if !already_installed.exists() {
-        Err(ToolchainError::ToolchainDoesNotExist.into())
+        msg!("Selected toolchain is not installed. Installing...", "");
+        // TODO: avoid recalling Project::find, ToolchainClient::using_data_dir, etc.
+        install(true).await // force since we know it doesn't exist alr
     } else {
         std::process::Command::new("ln")
             .arg("-s")
