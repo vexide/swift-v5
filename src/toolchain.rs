@@ -97,6 +97,9 @@ pub enum ToolchainError {
     #[error(transparent)]
     #[diagnostic(code(swift_v5::toolchain::io_error))]
     Io(#[from] std::io::Error),
+
+    #[error("Toolchain not installed. Run `swift v5 install` to install and symlink the toolchain for your project")]
+    ToolchainDoesNotExist,
 }
 
 #[derive(Debug, AsRefStr, Clone, Copy)]

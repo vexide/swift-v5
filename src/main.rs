@@ -1,4 +1,4 @@
-use std::{process::exit, sync::LazyLock};
+use std::{io::stdout, process::{Stdio, exit}, sync::LazyLock};
 
 use axoupdater::AxoUpdater;
 use clap::{Parser, Subcommand};
@@ -8,7 +8,7 @@ use owo_colors::OwoColorize;
 use swift_v5::{
     msg,
     project::Project,
-    toolchain::{HostArch, HostOS, ToolchainClient, ToolchainVersion},
+    toolchain::{HostArch, HostOS, ToolchainClient, ToolchainError, ToolchainVersion},
 };
 use tokio::{sync::Mutex, task::block_in_place};
 use tokio_util::sync::CancellationToken;
@@ -38,6 +38,9 @@ enum Commands {
     /// Update swift-v5 to the latest version
     #[clap(hide = !can_update())]
     Update {},
+    /// Symlink the project's toolchain to ./llvm-toolchain, needed for swift
+    /// builds
+    Symlink {}
 }
 
 #[tokio::main]
@@ -65,6 +68,9 @@ async fn main() -> miette::Result<()> {
         Commands::Update {} => {
             update().await?;
         }
+        Commands::Symlink {} => {
+            symlink().await?;
+        }
     }
 
     Ok(())
@@ -84,7 +90,8 @@ async fn install(force: bool) -> swift_v5::Result<()> {
     } else {
         toolchain_release = toolchain.latest_release().await?;
         toolchain_version = toolchain_release.version().to_owned();
-        confirm_message = format!("Download & install latest LLVM toolchain ({toolchain_version})?");
+        confirm_message =
+            format!("Download & install latest LLVM toolchain ({toolchain_version})?");
     }
 
     if !force {
@@ -134,7 +141,43 @@ async fn install(force: bool) -> swift_v5::Result<()> {
         .await?;
     msg!("Downloaded", "to {}", destination.display());
 
+    // lol
+    msg!("Creating symlink for llvm-toolchain", "");
+
+    std::process::Command::new("ln")
+        .arg("-s")
+        .arg(destination)
+        .arg("llvm-toolchain")
+        .stdin(Stdio::null())
+        .stderr(stdout())
+        .output()?;
+
     Ok(())
+}
+
+
+async fn symlink() -> swift_v5::Result<()> {
+    let project = Project::find().await?;
+    let toolchain = ToolchainClient::using_data_dir().await?;
+    let version = if let Some(config) = project.config().await? {
+        ToolchainVersion::named(&config.llvm_version)
+    } else {
+        toolchain.latest_release().await?.version().to_owned()
+    };
+    let already_installed = toolchain.install_path_for(&version);
+    if !already_installed.exists() {
+        Err(ToolchainError::ToolchainDoesNotExist.into())
+    } else {
+        std::process::Command::new("ln")
+            .arg("-s")
+            .arg(already_installed)
+            .arg("llvm-toolchain")
+            .stdin(Stdio::null())
+            .stderr(stdout())
+            .output()?;
+        Ok(())
+    }
+
 }
 
 static UPDATER: LazyLock<Mutex<AxoUpdater>> =
