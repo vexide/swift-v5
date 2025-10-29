@@ -1,5 +1,6 @@
 use std::process::Command;
 use miette::Diagnostic;
+use owo_colors::OwoColorize as _;
 use thiserror::Error;
 
 #[derive(Debug, Error, Diagnostic)]
@@ -38,6 +39,8 @@ pub async fn build() -> crate::Result<()> {
     if !status.success() {
         return Err(BuildError::LlvmObjcopyFail.into());
     }
+
+    crate::msg!("Successfully built to ./build/release/VexSwiftApp.bin", "");
 
     Ok(())
 }
