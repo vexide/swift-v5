@@ -351,6 +351,20 @@ impl ToolchainClient {
         Ok(ToolchainRelease::new(latest_embedded_release.clone()))
     }
 
+    /// Fetches the given release of the Arm Toolchain for Embedded (ATfE) from the ARM GitHub repository.
+    #[instrument(skip(self))]
+    pub async fn get_release(&self, version: &str) -> Result<ToolchainRelease, ToolchainError> {
+        let release = self
+            .gh_client
+            .repos(Self::REPO_OWNER, Self::REPO_NAME)
+            .releases()
+            .get_by_tag(&format!("{}{}{}", Self::RELEASE_PREFIX, version, Self::RELEASE_SUFFIX))
+            .await?;
+
+        Ok(ToolchainRelease::new(release.clone()))
+    }
+
+
     /// Returns the path where the given toolchain version would be installed.
     pub fn install_path_for(&self, version: &ToolchainVersion) -> PathBuf {
         self.toolchains_path.join(&version.name)

@@ -74,18 +74,17 @@ async fn install(force: bool) -> swift_v5::Result<()> {
     let project = Project::find().await?;
     let toolchain = ToolchainClient::using_data_dir().await?;
 
+    let toolchain_release;
+    let confirm_message;
     let toolchain_version;
-    let mut toolchain_release = None;
-    let installing_specific_version;
-
     if let Some(config) = project.config().await? {
-        toolchain_version = ToolchainVersion::named(&config.llvm_version);
-        installing_specific_version = true;
+        toolchain_release = toolchain.get_release(&config.llvm_version).await?;
+        toolchain_version = toolchain_release.version().to_owned();
+        confirm_message = format!("Download & install LLVM toolchain {toolchain_version}?");
     } else {
-        let latest = toolchain.latest_release().await?;
-        toolchain_version = latest.version().to_owned();
-        toolchain_release = Some(latest);
-        installing_specific_version = false;
+        toolchain_release = toolchain.latest_release().await?;
+        toolchain_version = toolchain_release.version().to_owned();
+        confirm_message = format!("Download & install latest LLVM toolchain ({toolchain_version})?");
     }
 
     if !force {
@@ -100,12 +99,6 @@ async fn install(force: bool) -> swift_v5::Result<()> {
         }
     }
 
-    let confirm_message = if installing_specific_version {
-        format!("Download & install LLVM toolchain {toolchain_version}?")
-    } else {
-        format!("Download & install latest LLVM toolchain ({toolchain_version})?")
-    };
-
     let confirmation = Confirm::new(&confirm_message)
         .with_default(true)
         .with_help_message("Required support libraries for Embedded Swift. No = cancel")
@@ -116,7 +109,6 @@ async fn install(force: bool) -> swift_v5::Result<()> {
         exit(1);
     }
 
-    let toolchain_release = toolchain_release.expect("todo: fetch release for specific version");
     let asset = toolchain_release.asset_for(HostOS::current(), HostArch::current())?;
 
     msg!(
