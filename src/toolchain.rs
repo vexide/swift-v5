@@ -362,7 +362,7 @@ impl ToolchainClient {
             .gh_client
             .repos(Self::REPO_OWNER, Self::REPO_NAME)
             .releases()
-            .get_by_tag(&format!("{}{}{}", Self::RELEASE_PREFIX, version.to_tag_name(), Self::RELEASE_SUFFIX))
+            .get_by_tag(&dbg!(version.to_tag_name()))
             .await?;
 
         Ok(ToolchainRelease::new(release.clone()))
