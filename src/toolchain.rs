@@ -45,6 +45,7 @@ static APP_USER_AGENT: &str = concat!(
     ")",
 );
 
+
 #[derive(Debug, Error, Diagnostic)]
 pub enum ToolchainError {
     #[error(

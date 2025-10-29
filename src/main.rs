@@ -1,4 +1,8 @@
-use std::{io::stdout, process::{Stdio, exit}, sync::LazyLock};
+use std::{
+    io::stdout,
+    process::{Command, Stdio, exit},
+    sync::LazyLock,
+};
 
 use axoupdater::AxoUpdater;
 use clap::{Parser, Subcommand};
@@ -6,9 +10,7 @@ use human_panic::Metadata;
 use inquire::Confirm;
 use owo_colors::OwoColorize;
 use swift_v5::{
-    msg,
-    project::Project,
-    toolchain::{HostArch, HostOS, ToolchainClient, ToolchainError, ToolchainVersion},
+    build::build, msg, project::Project, toolchain::{HostArch, HostOS, ToolchainClient, ToolchainError, ToolchainVersion}
 };
 use tokio::{sync::Mutex, task::block_in_place};
 use tokio_util::sync::CancellationToken;
@@ -40,7 +42,11 @@ enum Commands {
     Update {},
     /// Symlink the project's toolchain to ./llvm-toolchain, needed for swift
     /// builds
-    Symlink {}
+    Symlink {},
+    /// Builds the project using the Swift compiler. Requires the appropriate
+    /// Swift version installed (`swiftly install` in your project) and the
+    /// LLVM toolchain properly installed and symlinked (`swift v5 install`).
+    Build {},
 }
 
 #[tokio::main]
@@ -70,6 +76,9 @@ async fn main() -> miette::Result<()> {
         }
         Commands::Symlink {} => {
             symlink().await?;
+        }
+        Commands::Build {} => {
+            build().await?;
         }
     }
 
@@ -141,7 +150,6 @@ async fn install(force: bool) -> swift_v5::Result<()> {
         .await?;
     msg!("Downloaded", "to {}", destination.display());
 
-    // lol
     msg!("Creating symlink for llvm-toolchain", "");
 
     std::process::Command::new("ln")
@@ -154,7 +162,6 @@ async fn install(force: bool) -> swift_v5::Result<()> {
 
     Ok(())
 }
-
 
 async fn symlink() -> swift_v5::Result<()> {
     let project = Project::find().await?;
@@ -177,8 +184,8 @@ async fn symlink() -> swift_v5::Result<()> {
             .output()?;
         Ok(())
     }
-
 }
+
 
 static UPDATER: LazyLock<Mutex<AxoUpdater>> =
     LazyLock::new(|| Mutex::new(AxoUpdater::new_for("swift-v5")));

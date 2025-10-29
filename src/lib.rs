@@ -12,6 +12,7 @@ use trash::TrashContext;
 
 pub mod project;
 pub mod toolchain;
+pub mod build;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -81,6 +82,10 @@ pub enum Error {
     #[error(transparent)]
     #[diagnostic(transparent)]
     Toolchain(#[from] toolchain::ToolchainError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Build(#[from] build::BuildError),
 
     #[error(transparent)]
     #[diagnostic(code(swift_v5::interactive_prompt_failed))]
