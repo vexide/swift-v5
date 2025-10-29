@@ -35,6 +35,7 @@ use crate::{
 };
 
 mod extract;
+pub mod install;
 
 static APP_USER_AGENT: &str = concat!(
     env!("CARGO_PKG_NAME"),

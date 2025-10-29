@@ -1,9 +1,9 @@
-use std::{cell::OnceCell, env, io::ErrorKind, path::PathBuf, str::FromStr};
+use std::{cell::OnceCell, env, io::ErrorKind, path::PathBuf, process::Command, str::FromStr};
 
 use serde::Deserialize;
 use tracing::{debug, trace};
 
-use crate::{Error, Result, fs};
+use crate::{Error, Result, build::{BuildError, BuildTarget}, fs};
 
 #[derive(Debug)]
 pub struct Project {
@@ -42,6 +42,32 @@ impl Project {
 
     pub fn config_path(&self) -> PathBuf {
         self.path.join(ProjectConfig::FILE_NAME)
+    }
+
+    pub fn output_path(target: &BuildTarget) -> crate::Result<PathBuf> {
+        let path = Command::new("swift")
+            .arg("build")
+            .arg("-c")
+            .arg(target.arg())
+            .arg("--triple")
+            .arg("armv7-none-none-eabi")
+            .arg("--show-bin-path")
+            .output()?;
+        let path =
+            PathBuf::from_str(
+                &String::from_utf8(path.stdout).map_err(|_| BuildError::OutputFolderInvalid)?.trim(),
+            )
+            .map_err(|_| BuildError::OutputFolderInvalid)?;
+        Ok(path)
+    }
+    pub fn executable_name() -> crate::Result<String> {
+        let name = Command::new("swift")
+            .arg("package")
+            .arg("show-executables")
+            .output()?;
+        let name = String::from_utf8(name.stdout).map_err(|_| BuildError::ExecutableNameInvalid)?;
+        let name = name.lines().next().ok_or(BuildError::ExecutableNameInvalid)?;
+        Ok(name.to_string())
     }
 
     pub async fn config(&self) -> Result<Option<&ProjectConfig>> {

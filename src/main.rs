@@ -1,19 +1,13 @@
-use std::{
-    io::stdout,
-    process::{Command, Stdio, exit},
-    sync::LazyLock,
-};
+use std::sync::LazyLock;
 
 use axoupdater::AxoUpdater;
 use clap::{Parser, Subcommand};
 use human_panic::Metadata;
-use inquire::Confirm;
 use owo_colors::OwoColorize;
 use swift_v5::{
-    build::build, msg, project::Project, toolchain::{HostArch, HostOS, ToolchainClient, ToolchainError, ToolchainVersion}
+    build::{BuildTarget, build}, msg, symlink::symlink, toolchain::install::install
 };
 use tokio::{sync::Mutex, task::block_in_place};
-use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{EnvFilter, util::SubscriberInitExt};
 
 /// Create VEX V5 programs in Swift
@@ -42,11 +36,14 @@ enum Commands {
     Update {},
     /// Symlink the project's toolchain to ./llvm-toolchain, needed for swift
     /// builds
-    Symlink {},
+    Activate {},
     /// Builds the project using the Swift compiler. Requires the appropriate
     /// Swift version installed (`swiftly install` in your project) and the
     /// LLVM toolchain properly installed and symlinked (`swift v5 install`).
-    Build {},
+    Build {
+        #[arg(long, value_enum, default_value_t = BuildTarget::Release)]
+        target: BuildTarget
+    },
 }
 
 #[tokio::main]
@@ -74,118 +71,15 @@ async fn main() -> miette::Result<()> {
         Commands::Update {} => {
             update().await?;
         }
-        Commands::Symlink {} => {
+        Commands::Activate {} => {
             symlink().await?;
         }
-        Commands::Build {} => {
-            build().await?;
+        Commands::Build { target } => {
+            build(&target).await?;
         }
     }
 
     Ok(())
-}
-
-async fn install(force: bool) -> swift_v5::Result<()> {
-    let project = Project::find().await?;
-    let toolchain = ToolchainClient::using_data_dir().await?;
-
-    let toolchain_release;
-    let confirm_message;
-    let toolchain_version;
-    if let Some(config) = project.config().await? {
-        toolchain_version = ToolchainVersion::named(&config.llvm_version);
-        toolchain_release = toolchain.get_release(&toolchain_version).await?;
-        confirm_message = format!("Download & install LLVM toolchain {toolchain_version}?");
-    } else {
-        toolchain_release = toolchain.latest_release().await?;
-        toolchain_version = toolchain_release.version().to_owned();
-        confirm_message =
-            format!("Download & install latest LLVM toolchain ({toolchain_version})?");
-    }
-
-    if !force {
-        let already_installed = toolchain.install_path_for(&toolchain_version);
-        if already_installed.exists() {
-            println!(
-                "Toolchain up-to-date: {} at {}",
-                toolchain_version.to_string().bold(),
-                already_installed.display().green()
-            );
-            return Ok(());
-        }
-    }
-
-    let confirmation = Confirm::new(&confirm_message)
-        .with_default(true)
-        .with_help_message("Required support libraries for Embedded Swift. No = cancel")
-        .prompt()?;
-
-    if !confirmation {
-        eprintln!("Cancelled.");
-        exit(1);
-    }
-
-    let asset = toolchain_release.asset_for(HostOS::current(), HostArch::current())?;
-
-    msg!(
-        "Downloading",
-        "{} <{}>",
-        asset.name.bold(),
-        asset.browser_download_url.green()
-    );
-
-    let cancel_token = CancellationToken::new();
-
-    tokio::spawn({
-        let cancel_token = cancel_token.clone();
-        async move {
-            tokio::signal::ctrl_c().await.unwrap();
-            cancel_token.cancel();
-            eprintln!("Cancelled.");
-        }
-    });
-
-    let destination = toolchain
-        .download_and_install(&toolchain_release, asset, cancel_token)
-        .await?;
-    msg!("Downloaded", "to {}", destination.display());
-
-    msg!("Creating symlink for llvm-toolchain", "");
-
-    std::process::Command::new("ln")
-        .arg("-s")
-        .arg(destination)
-        .arg("llvm-toolchain")
-        .stdin(Stdio::null())
-        .stderr(stdout())
-        .output()?;
-
-    Ok(())
-}
-
-async fn symlink() -> swift_v5::Result<()> {
-    let project = Project::find().await?;
-    let toolchain = ToolchainClient::using_data_dir().await?;
-    let version = if let Some(config) = project.config().await? {
-        ToolchainVersion::named(&config.llvm_version)
-    } else {
-        toolchain.latest_release().await?.version().to_owned()
-    };
-    let already_installed = toolchain.install_path_for(&version);
-    if !already_installed.exists() {
-        msg!("Selected toolchain is not installed. Installing...", "");
-        // TODO: avoid recalling Project::find, ToolchainClient::using_data_dir, etc.
-        install(true).await // force since we know it doesn't exist alr
-    } else {
-        std::process::Command::new("ln")
-            .arg("-s")
-            .arg(already_installed)
-            .arg("llvm-toolchain")
-            .stdin(Stdio::null())
-            .stderr(stdout())
-            .output()?;
-        Ok(())
-    }
 }
 
 

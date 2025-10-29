@@ -13,6 +13,7 @@ use trash::TrashContext;
 pub mod project;
 pub mod toolchain;
 pub mod build;
+pub mod symlink;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
