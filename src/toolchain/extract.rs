@@ -18,7 +18,7 @@ use tokio::{
     task::{JoinSet, spawn_blocking},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, instrument, trace, warn};
+use tracing::{debug, instrument, trace};
 use walkdir::WalkDir;
 use zip::{read::root_dir_common_filter, result::ZipError};
 

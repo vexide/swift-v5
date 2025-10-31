@@ -10,7 +10,9 @@ pub(crate) use fs_err::tokio as fs;
 use tokio_util::sync::CancellationToken;
 use trash::TrashContext;
 
+pub mod build;
 pub mod project;
+pub mod symlink;
 pub mod toolchain;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -81,6 +83,10 @@ pub enum Error {
     #[error(transparent)]
     #[diagnostic(transparent)]
     Toolchain(#[from] toolchain::ToolchainError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Build(#[from] build::BuildError),
 
     #[error(transparent)]
     #[diagnostic(code(swift_v5::interactive_prompt_failed))]
