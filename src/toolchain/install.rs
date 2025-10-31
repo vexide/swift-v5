@@ -1,10 +1,13 @@
-use std::{io::stdout, process::{Stdio, exit}};
+use std::process::exit;
 
+use crate::{
+    msg,
+    project::Project,
+    toolchain::{HostArch, HostOS, ToolchainClient, ToolchainVersion},
+};
 use inquire::Confirm;
 use owo_colors::OwoColorize;
 use tokio_util::sync::CancellationToken;
-
-use crate::{msg, project::Project, toolchain::{HostArch, HostOS, ToolchainClient, ToolchainVersion}};
 
 pub async fn install(force: bool) -> crate::Result<()> {
     let project = Project::find().await?;
@@ -70,16 +73,6 @@ pub async fn install(force: bool) -> crate::Result<()> {
         .download_and_install(&toolchain_release, asset, cancel_token)
         .await?;
     msg!("Downloaded", "to {}", destination.display());
-
-    msg!("Creating symlink for llvm-toolchain", "");
-
-    std::process::Command::new("ln")
-        .arg("-s")
-        .arg(destination)
-        .arg("llvm-toolchain")
-        .stdin(Stdio::null())
-        .stderr(stdout())
-        .output()?;
 
     Ok(())
 }

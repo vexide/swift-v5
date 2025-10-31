@@ -3,7 +3,11 @@ use std::{cell::OnceCell, env, io::ErrorKind, path::PathBuf, process::Command, s
 use serde::Deserialize;
 use tracing::{debug, trace};
 
-use crate::{Error, Result, build::{BuildError, BuildTarget}, fs};
+use crate::{
+    Error, Result,
+    build::{BuildError, BuildTarget},
+    fs,
+};
 
 #[derive(Debug)]
 pub struct Project {
@@ -53,11 +57,12 @@ impl Project {
             .arg("armv7-none-none-eabi")
             .arg("--show-bin-path")
             .output()?;
-        let path =
-            PathBuf::from_str(
-                &String::from_utf8(path.stdout).map_err(|_| BuildError::OutputFolderInvalid)?.trim(),
-            )
-            .map_err(|_| BuildError::OutputFolderInvalid)?;
+        let path = PathBuf::from_str(
+            String::from_utf8(path.stdout)
+                .map_err(|_| BuildError::OutputFolderInvalid)?
+                .trim(),
+        )
+        .map_err(|_| BuildError::OutputFolderInvalid)?;
         Ok(path)
     }
     pub fn executable_name() -> crate::Result<String> {
@@ -66,7 +71,10 @@ impl Project {
             .arg("show-executables")
             .output()?;
         let name = String::from_utf8(name.stdout).map_err(|_| BuildError::ExecutableNameInvalid)?;
-        let name = name.lines().next().ok_or(BuildError::ExecutableNameInvalid)?;
+        let name = name
+            .lines()
+            .next()
+            .ok_or(BuildError::ExecutableNameInvalid)?;
         Ok(name.to_string())
     }
 

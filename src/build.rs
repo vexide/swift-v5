@@ -1,8 +1,7 @@
+use clap::Args;
 use miette::Diagnostic;
 use owo_colors::OwoColorize as _;
-use std::
-    process::Command
-;
+use std::process::Command;
 use thiserror::Error;
 
 use crate::{project::Project, symlink::symlink};
@@ -34,7 +33,17 @@ impl std::fmt::Display for BuildTarget {
     }
 }
 
-pub async fn build(target: &BuildTarget) -> crate::Result<()> {
+#[derive(Args, Debug)]
+pub struct SwiftOpts {
+    #[arg(
+        trailing_var_arg = true,
+        allow_hyphen_values = true,
+        value_name = "SWIFT-OPTIONS"
+    )]
+    args: Vec<String>,
+}
+
+pub async fn build(target: &BuildTarget, opts: &SwiftOpts) -> crate::Result<()> {
     // TODO: allow custom args to be passed thru to the `swift` invocation
     // resymlink to be safe
     if !symlink().await? {
@@ -43,6 +52,7 @@ pub async fn build(target: &BuildTarget) -> crate::Result<()> {
 
     let status = Command::new("swift")
         .arg("build")
+        .args(opts.args.clone())
         .arg("-c")
         .arg(target.arg())
         .arg("--triple")

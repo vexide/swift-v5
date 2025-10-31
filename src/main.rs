@@ -5,7 +5,10 @@ use clap::{Parser, Subcommand};
 use human_panic::Metadata;
 use owo_colors::OwoColorize;
 use swift_v5::{
-    build::{BuildTarget, build}, msg, symlink::symlink, toolchain::install::install
+    build::{BuildTarget, SwiftOpts, build},
+    msg,
+    symlink::symlink,
+    toolchain::install::install,
 };
 use tokio::{sync::Mutex, task::block_in_place};
 use tracing_subscriber::{EnvFilter, util::SubscriberInitExt};
@@ -42,7 +45,10 @@ enum Commands {
     /// LLVM toolchain properly installed and symlinked (`swift v5 install`).
     Build {
         #[arg(long, value_enum, default_value_t = BuildTarget::Release)]
-        target: BuildTarget
+        target: BuildTarget,
+        /// Arguments forwarded to `swift`.
+        #[clap(flatten)]
+        swift_opts: SwiftOpts,
     },
 }
 
@@ -74,14 +80,13 @@ async fn main() -> miette::Result<()> {
         Commands::Activate {} => {
             symlink().await?;
         }
-        Commands::Build { target } => {
-            build(&target).await?;
+        Commands::Build { target, swift_opts } => {
+            build(&target, &swift_opts).await?;
         }
     }
 
     Ok(())
 }
-
 
 static UPDATER: LazyLock<Mutex<AxoUpdater>> =
     LazyLock::new(|| Mutex::new(AxoUpdater::new_for("swift-v5")));

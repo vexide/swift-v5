@@ -1,10 +1,15 @@
+use std::io::ErrorKind;
 #[cfg(unix)]
 use std::path::Path;
 
 use inquire::Confirm;
 use owo_colors::OwoColorize;
 
-use crate::{msg, project::Project, toolchain::{ToolchainClient, ToolchainVersion, install::install}};
+use crate::{
+    msg,
+    project::Project,
+    toolchain::{ToolchainClient, ToolchainVersion, install::install},
+};
 
 #[cfg(unix)]
 fn symlink_internal<A: AsRef<Path>, B: AsRef<Path>>(original: A, to: B) -> std::io::Result<()> {
@@ -34,6 +39,7 @@ pub async fn symlink() -> crate::Result<bool> {
         toolchain.latest_release().await?.version().to_owned()
     };
     let already_installed = toolchain.install_path_for(&version);
+    // if we're forcing the symlink, we don't care whether its alr installed
     if !already_installed.exists() {
         msg!("Selected toolchain is not installed. Installing...", "");
         // TODO: avoid recalling Project::find, ToolchainClient::using_data_dir, etc.
@@ -41,11 +47,11 @@ pub async fn symlink() -> crate::Result<bool> {
         Ok(true)
     } else {
         match symlink_internal(already_installed, String::from("./llvm-toolchain")) {
-            Err(e) if e.raw_os_error() == Some(17) => {
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => {
                 // The symlink already exists, which is fine.
                 Ok(())
             }
-            res => res
+            res => res,
         }?;
         Ok(true)
     }

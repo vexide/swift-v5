@@ -10,10 +10,10 @@ pub(crate) use fs_err::tokio as fs;
 use tokio_util::sync::CancellationToken;
 use trash::TrashContext;
 
-pub mod project;
-pub mod toolchain;
 pub mod build;
+pub mod project;
 pub mod symlink;
+pub mod toolchain;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
